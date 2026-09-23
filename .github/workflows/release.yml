@@ -11,20 +11,32 @@ permissions:
 
 jobs:
   goreleaser:
-    if: ${{ false }}
-    runs-on: blacksmith-6vcpu-macos-26
+    runs-on:
+      group: m7b-squid
+      labels: m7b-macos-arm64
     timeout-minutes: 15
     env:
-      MACOS_SIGN_P12: ${{ secrets.MACOS_SIGN_P12 }}
-      MACOS_SIGN_PASSWORD: ${{ secrets.MACOS_SIGN_PASSWORD }}
-      MACOS_NOTARY_KEY: ${{ secrets.MACOS_NOTARY_KEY }}
-      MACOS_NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
-      MACOS_NOTARY_ISSUER_ID: ${{ secrets.MACOS_NOTARY_ISSUER_ID }}
+      DEVELOPER_DIR: /Applications/Xcode.app/Contents/Developer
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
           fetch-depth: 0
+          persist-credentials: false
+
+      - name: Load release secrets
+        uses: 1password/load-secrets-action@70062d7a876d3eb6334754fa26efd2fbd90c32f2
+        with:
+          export-env: true
+          version: 2.39.0
+        env:
+          OP_CONNECT_HOST: https://vault.m7b.io
+          OP_CONNECT_TOKEN: ${{ secrets.VAULT_SNAV_RELEASE }}
+          MACOS_NOTARY_ISSUER_ID: op://n4bct6bnrutlzyhixr2vszfo34/z7xr4455ovgfqz4v33njk7znfi/55920b96f36b46346238a5c4
+          MACOS_NOTARY_KEY: op://n4bct6bnrutlzyhixr2vszfo34/z7xr4455ovgfqz4v33njk7znfi/17d20708816ffca9a49c0264
+          MACOS_NOTARY_KEY_ID: op://n4bct6bnrutlzyhixr2vszfo34/z7xr4455ovgfqz4v33njk7znfi/a51ddac6cefce03cd8e437af
+          MACOS_SIGN_P12: op://n4bct6bnrutlzyhixr2vszfo34/z7xr4455ovgfqz4v33njk7znfi/xnvhe5mawjt3cvqibum3cv6zga
+          MACOS_SIGN_PASSWORD: op://n4bct6bnrutlzyhixr2vszfo34/z7xr4455ovgfqz4v33njk7znfi/c0669fbb8623da8f934a2477
 
       - name: Setup Go
         uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c
@@ -42,8 +54,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-release-go-
 
-      - name: Install Zig and ripgrep
-        run: brew install zig ripgrep
+      - name: Setup release tools
+        uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151
+        with:
+          cache: false
+          install_args: zig ripgrep
 
       - name: Resolve macOS SDK
         run: echo "SDK_PATH=$(xcrun --show-sdk-path)" >> "$GITHUB_ENV"
@@ -58,4 +73,4 @@ jobs:
           version: ~> v2
           args: release --clean
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
